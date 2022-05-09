@@ -97,7 +97,6 @@ void send_sudoku_result(int cfd, char *path, struct epoll_event *ev, int epfd, i
 
 bool parse_content(char *content, vector<vector<int> > &sudoku_matrix) {
 	string s_content = content;
-	cout << s_content << endl;
 	if(s_content[s_content.size() - 1] == '?')
 		return false;
 	if(s_content.find("/?") != 0 && s_content.find("/sudoku.html?") != 0)
@@ -139,42 +138,46 @@ void read_client_request(int epfd, struct epoll_event *ev) {
 	char content[1024] = "";
 	char protocol[256] = "";
 	sscanf(buf, "%[^ ] %[^ ] %[^ \r\n]", method, content, protocol);
-	vector<vector<int> > sudoku_matrix;
-	if(parse_content(content, sudoku_matrix)) {
-		int matrix[9][9];
-		bool valid = false;
-		bool invalid = false;
-		memset(matrix, 0, sizeof(matrix));
-		for(int i = 0;i < 9;i++) {
-			for(int j = 0;j < 9;j++) {
-				matrix[i][j] = sudoku_matrix[i][j];
-				if(matrix[i][j] > 0)
-					valid = true;
-				if(matrix[i][j] < 0 || matrix[i][j] > 9)
-					invalid = true;
+
+	if(strcasecmp(method, "get") == 0) {
+		vector<vector<int> > sudoku_matrix;
+		if(parse_content(content, sudoku_matrix)) {
+			int matrix[9][9];
+			bool valid = false;
+			bool invalid = false;
+			memset(matrix, 0, sizeof(matrix));
+			for(int i = 0;i < 9;i++) {
+				for(int j = 0;j < 9;j++) {
+					matrix[i][j] = sudoku_matrix[i][j];
+					if(matrix[i][j] > 0)
+						valid = true;
+					if(matrix[i][j] < 0 || matrix[i][j] > 9)
+						invalid = true;
+				}
 			}
-		}
-		if(invalid || !valid) {
+			if(invalid || !valid) {
+				send_header(ev->data.fd, 200, "OK", get_mime_type(".html"), 0);
+				send_file(ev->data.fd, "sudoku.html", ev, epfd, 1);
+				return;
+			}
+			Sudoku s(matrix);
+			s.Solve();
+			if(s.solve_result.size() > 0) {
+				send_header(ev->data.fd, 200, "OK", get_mime_type(".html"), 0);
+				send_sudoku_result(ev->data.fd, "sudoku_result.html", ev, epfd, 1, s.solve_result[0]);
+				return;
+			}
 			send_header(ev->data.fd, 200, "OK", get_mime_type(".html"), 0);
 			send_file(ev->data.fd, "sudoku.html", ev, epfd, 1);
 			return;
 		}
-		Sudoku s(matrix);
-		s.Solve();
-		if(s.solve_result.size() > 0) {
-			send_header(ev->data.fd, 200, "OK", get_mime_type(".html"), 0);
-			send_sudoku_result(ev->data.fd, "sudoku_result.html", ev, epfd, 1, s.solve_result[0]);
-			return;
-		}
-	}
 
-	if(strcasecmp(method, "get") == 0) {
+//	if(strcasecmp(method, "get") == 0) {
 		char *strfile = content + 1;
 		strdecode(strfile, strfile);
 		if(*strfile == 0) {
 			strfile = (char*)"./sudoku.html";
 		}
-		cout << strfile << endl;
 		string temp = strfile;
 		if(temp[temp.size() - 1] == '?') {
 			strcpy(strfile, temp.substr(0, temp.size() - 1).c_str());
@@ -189,12 +192,10 @@ void read_client_request(int epfd, struct epoll_event *ev) {
 		} else {
 			//请求的是一个普通文件
 			if(S_ISREG(s.st_mode)) {
-				cout << "reg" << endl;
 				//先发送报头（状态行 消息头 空行）
 				send_header(ev->data.fd, 200, "OK", get_mime_type(strfile), s.st_size);
 				send_file(ev->data.fd, strfile, ev, epfd, 1);
 			} else if(S_ISDIR(s.st_mode)) {//请求的是一个目录
-				cout << "dir" << endl;
 				send_header(ev->data.fd, 200, "OK", get_mime_type(".html"), s.st_size);
 				send_file(ev->data.fd, "dir_header.html", ev, epfd, 0);
 				struct dirent **mylist = NULL;

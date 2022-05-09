@@ -17,6 +17,7 @@ private:
 	int potential_num_matrix[N][N];
 	bool confirm_matrix[N][N];
 	void InitSoduku(int matrix[N][N]);
+	bool CheckMatrix();
 	void UpdatePotentialMatrix();
 	void AddSudokuMatrix(int x, int y, int value);
 	void DeleteSudokuMatrix(int x, int y);

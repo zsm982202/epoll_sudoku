@@ -20,6 +20,29 @@ void Sudoku::InitSoduku(int matrix[N][N]) {
 	}
 }
 
+bool Sudoku::CheckMatrix() {
+	for(int i = 0; i < N; i++) {
+		for(int j = 0; j < N; j++) {
+			if(sudoku_matrix[i][j] == 0)
+				continue;
+			for (int k = 0; k < N; k++) {
+				if (k != j && sudoku_matrix[i][k] == sudoku_matrix[i][j])
+					return false;
+				if (k != i && sudoku_matrix[k][j] == sudoku_matrix[i][j])
+					return false;
+			}
+
+			for (int m = i / M * M; m < i / M * M + M; m++) {
+				for (int n = j / M * M; n < j / M * M + M; n++) {
+					if ((m != i || n != j) && sudoku_matrix[m][n] == sudoku_matrix[i][j])
+						return false;
+				}
+			}
+		}
+	}
+	return true;
+}
+
 void Sudoku::UpdatePotentialMatrix() {
 	for (int i = 0; i < N; i++) {
 		for (int j = 0; j < N; j++) {
@@ -155,6 +178,8 @@ void Sudoku::SudokuDFS(int x, int y, int value, int step) {
 }
 
 void Sudoku::Solve() {
+	if(!CheckMatrix())
+		return;
 	UpdatePotentialMatrix();
 	int start_x, start_y, start_value, start_step = 0;
 	GetNextPos(start_x, start_y);
